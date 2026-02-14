@@ -1,1 +1,55 @@
-const express = require("express"); const ffmpeg = require("fluent-ffmpeg"); const fs = require("fs"); const path = require("path"); const axios = require("axios"); const app = express(); app.use(express.json()); const PORT = process.env.PORT || 10000; app.post("/render", async (req, res) => { try { const { image_url, title } = req.body; if (!image_url) { return res.status(400).json({ error: "image_url required" }); } const tempImagePath = path.join(__dirname, "input.jpg"); const outputPath = path.join(__dirname, "output.mp4"); // Download image const response = await axios({ url: image_url, method: "GET", responseType: "stream", }); const writer = fs.createWriteStream(tempImagePath); response.data.pipe(writer); writer.on("finish", () => { ffmpeg(tempImagePath) .loop(7) .size("1080x1920") .outputOptions([ "-vf scale=1080:1920:force_original_aspect_ratio=cover", "-pix_fmt yuv420p", "-r 30" ]) .save(outputPath) .on("end", () => { res.download(outputPath, "reel.mp4"); }); }); } catch (err) { console.error(err); res.status(500).json({ error: "Render failed" }); } }); app.listen(PORT, () => { console.log("Server running on port " + PORT); });
+const express = require("express");
+const ffmpeg = require("fluent-ffmpeg");
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT || 10000;
+
+app.post("/render", async (req, res) => {
+  try {
+    const { image_url, title } = req.body;
+
+    if (!image_url) {
+      return res.status(400).json({ error: "image_url required" });
+    }
+
+    const tempImagePath = path.join(__dirname, "input.jpg");
+    const outputPath = path.join(__dirname, "output.mp4");
+
+    const response = await axios({
+      url: image_url,
+      method: "GET",
+      responseType: "stream",
+    });
+
+    const writer = fs.createWriteStream(tempImagePath);
+    response.data.pipe(writer);
+
+    writer.on("finish", () => {
+      ffmpeg(tempImagePath)
+        .loop(7)
+        .size("1080x1920")
+        .outputOptions([
+          "-vf scale=1080:1920:force_original_aspect_ratio=cover",
+          "-pix_fmt yuv420p",
+          "-r 30"
+        ])
+        .save(outputPath)
+        .on("end", () => {
+          res.download(outputPath, "reel.mp4");
+        });
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Render failed" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
